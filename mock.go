@@ -20,6 +20,8 @@ func (m *Mock) Expect(method string, args []any) *Expectation {
 }
 
 func (m *Mock) Call(method string, args []any) []any {
+	m.controller.t.Helper()
+
 	expectations := m.methods[method]
 	if expectations == nil {
 		m.controller.Failf("Method %q has no expectations", method)
@@ -47,7 +49,7 @@ func (m *Mock) Call(method string, args []any) []any {
 		}
 	}
 	if len(open) > 0 {
-		m.controller.Logf("On call:")
+		m.controller.Logf("Calling:")
 		m.controller.Logf("  %v(%v)", method, formatArgs(args))
 		m.controller.Logf("Open expectations:")
 		for _, e := range open {
@@ -59,6 +61,8 @@ func (m *Mock) Call(method string, args []any) []any {
 }
 
 func (m *Mock) checkExpectations() {
+	m.controller.t.Helper()
+
 	first := true
 	for method, expectations := range m.methods {
 		for _, e := range expectations {

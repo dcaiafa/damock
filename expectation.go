@@ -34,7 +34,7 @@ func (e *Expectation) isOpen() bool {
 }
 
 func (e *Expectation) isSatisfied() bool {
-	return e.calls > e.minCalls
+	return e.calls >= e.minCalls
 }
 
 func (e *Expectation) isMatch(args []any) bool {

@@ -6,34 +6,53 @@ import (
 	"strings"
 )
 
-type Matcher[T any] func(v T) bool
+type Matcher interface {
+	Match(v any) bool
+}
 
-func (m Matcher[T]) ToMatcherAny() Matcher[any] {
-	return Matcher[any](
-		func(v any) bool {
-			t := v.(T)
-			return m(t)
-		},
-	)
+type MatcherT[T any] func(v T) bool
+
+func (m MatcherT[T]) Match(v any) bool {
+	return m(v.(T))
+}
+
+func (m MatcherT[T]) String() string {
+	return "<custom-matcher>"
 }
 
 type AnyType struct{}
 
+func (a AnyType) Match(v any) bool {
+	return true
+}
+
 func (a AnyType) String() string {
-	return "<any>"
+	return "any"
 }
 
 var Any AnyType
 
+type NotNilType struct{}
+
+func (t NotNilType) Match(v any) bool {
+	return v != nil
+}
+
+func (t NotNilType) String() string {
+	return "!=nil"
+}
+
+var NotNil NotNilType
+
+type BasicMatchers interface {
+	AnyType | NotNilType
+}
+
 func isMatch(expected, actual any) bool {
-	switch expected := expected.(type) {
-	case Matcher[any]:
-		return expected(actual)
-	case AnyType:
-		return true
-	default:
-		return reflect.DeepEqual(expected, actual)
+	if m, ok := expected.(Matcher); ok {
+		return m.Match(actual)
 	}
+	return reflect.DeepEqual(expected, actual)
 }
 
 func formatArgs(args []any) string {
