@@ -31,6 +31,16 @@ func (r *mockFooDoStuff) Times(n int) *mockFooDoStuff {
 	return r
 }
 
+func (r *mockFooDoStuff) Do(f func(i int, s *Struct) (int, error)) {
+	r.e.Do(func(args []any) []any {
+		r1, r2 := f(
+			hammock.Get[int](args, 0),
+			hammock.Get[*Struct](args, 1),
+		)
+		return []any{r1, r2}
+	})
+}
+
 func Expect_Foo_DoStuff[
 	A1 int | hammock.BasicMatchers | hammock.MatcherT[int],
 	A2 *Struct | hammock.BasicMatchers | hammock.MatcherT[*Struct],

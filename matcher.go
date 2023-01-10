@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	"golang.org/x/exp/constraints"
 )
 
 type Matcher interface {
@@ -46,6 +48,22 @@ var NotNil NotNilType
 
 type BasicMatchers interface {
 	AnyType | NotNilType
+}
+
+func GT[T constraints.Ordered](v T) MatcherT[T] {
+	return MatcherT[T](func(x T) bool { return x > v })
+}
+
+func GE[T constraints.Ordered](v T) MatcherT[T] {
+	return MatcherT[T](func(x T) bool { return x >= v })
+}
+
+func LT[T constraints.Ordered](v T) MatcherT[T] {
+	return MatcherT[T](func(x T) bool { return x < v })
+}
+
+func LE[T constraints.Ordered](v T) MatcherT[T] {
+	return MatcherT[T](func(x T) bool { return x <= v })
 }
 
 func isMatch(expected, actual any) bool {
