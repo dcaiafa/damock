@@ -1,6 +1,9 @@
 package main
 
-import "github.com/dcaiafa/hammock"
+import (
+	"github.com/dcaiafa/hammock"
+	"github.com/dcaiafa/hammock/mockgears"
+)
 
 type MockFoo struct {
 	*hammock.Mock
@@ -12,8 +15,8 @@ func NewMockFoo(c *hammock.Controller) *MockFoo {
 
 func (m *MockFoo) DoStuff(i int, s *Struct) (int, error) {
 	res := m.Call("DoStuff", []any{i, s})
-	r1 := hammock.Get[int](res, 0)
-	r2 := hammock.Get[error](res, 1)
+	r1 := mockgears.Get[int](res, 0)
+	r2 := mockgears.Get[error](res, 1)
 	return r1, r2
 }
 
@@ -34,8 +37,8 @@ func (r *mockFooDoStuff) Times(n int) *mockFooDoStuff {
 func (r *mockFooDoStuff) Do(f func(i int, s *Struct) (int, error)) {
 	r.e.Do(func(args []any) []any {
 		r1, r2 := f(
-			hammock.Get[int](args, 0),
-			hammock.Get[*Struct](args, 1),
+			mockgears.Get[int](args, 0),
+			mockgears.Get[*Struct](args, 1),
 		)
 		return []any{r1, r2}
 	})
