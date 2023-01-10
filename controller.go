@@ -1,4 +1,4 @@
-package damock
+package hammock
 
 import "testing"
 

@@ -1,4 +1,4 @@
-package damock
+package hammock
 
 type Mock struct {
 	controller *Controller
@@ -13,41 +13,49 @@ func newMock(c *Controller) *Mock {
 	return m
 }
 
-func (m *Mock) On(method string, args []any) {
+func (m *Mock) Expect(method string, args []any) *Expectation {
+	e := newExpectation(args)
+	m.methods[method] = append(m.methods[method], e)
+	return e
+}
+
+func (m *Mock) Call(method string, args []any) []any {
 	expectations := m.methods[method]
 	if expectations == nil {
-		m.controller.Failf("There is no expectation for method %q", method)
-		return
+		m.controller.Failf("Method %q has no expectations", method)
+		return nil
 	}
 
-	foundMatch := false
 	for _, e := range expectations {
-		if e.isOpen() {
+		if !e.isOpen() {
 			continue
 		}
+
 		if e.isMatch(args) {
 			e.calls++
-			foundMatch = true
-			break
+			if e.do != nil {
+				return e.do(args)
+			}
+			return e.results
 		}
 	}
 
-	if !foundMatch {
-		var open []*Expectation
-		for _, e := range expectations {
-			if e.isOpen() {
-				open = append(open, e)
-			}
-		}
-		if len(open) > 0 {
-			m.controller.Logf("On call:")
-			m.controller.Logf("  %v(%v)", method, formatArgs(args))
-			m.controller.Logf("Open expectations:")
-			for _, e := range open {
-				m.controller.Logf("  %v(%v)", method, formatArgs(e.args))
-			}
+	var open []*Expectation
+	for _, e := range expectations {
+		if e.isOpen() {
+			open = append(open, e)
 		}
 	}
+	if len(open) > 0 {
+		m.controller.Logf("On call:")
+		m.controller.Logf("  %v(%v)", method, formatArgs(args))
+		m.controller.Logf("Open expectations:")
+		for _, e := range open {
+			m.controller.Logf("  %v(%v)", method, formatArgs(e.args))
+		}
+	}
+	m.controller.Failf("No matching expectations")
+	return nil
 }
 
 func (m *Mock) checkExpectations() {

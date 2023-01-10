@@ -1,4 +1,4 @@
-package damock
+package hammock
 
 import (
 	"fmt"
@@ -6,23 +6,34 @@ import (
 	"strings"
 )
 
-type Matcher struct {
-	Match    func(v any) bool
-	ToString func() string
+type Matcher[T any] func(v T) bool
+
+func (m Matcher[T]) ToMatcherAny() Matcher[any] {
+	return Matcher[any](
+		func(v any) bool {
+			t := v.(T)
+			return m(t)
+		},
+	)
 }
 
-func (m *Matcher) String() string {
-	if m.ToString != nil {
-		return m.ToString()
-	}
-	return "<Matcher>"
+type AnyType struct{}
+
+func (a AnyType) String() string {
+	return "<any>"
 }
+
+var Any AnyType
 
 func isMatch(expected, actual any) bool {
-	if m, ok := expected.(Matcher); ok {
-		return m.Match(actual)
+	switch expected := expected.(type) {
+	case Matcher[any]:
+		return expected(actual)
+	case AnyType:
+		return true
+	default:
+		return reflect.DeepEqual(expected, actual)
 	}
-	return reflect.DeepEqual(expected, actual)
 }
 
 func formatArgs(args []any) string {

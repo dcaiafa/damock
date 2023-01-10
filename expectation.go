@@ -1,15 +1,15 @@
-package damock
+package hammock
 
 type Expectation struct {
 	args     []any
 	results  []any
 	minCalls int
 	maxCalls int
-	on       func(args []any) []any
+	do       func(args []any) []any
 	calls    int
 }
 
-func NewExpectation(args []any) *Expectation {
+func newExpectation(args []any) *Expectation {
 	return &Expectation{
 		args:     args,
 		maxCalls: 1,
@@ -25,8 +25,8 @@ func (e *Expectation) Times(n int) {
 	e.maxCalls = n
 }
 
-func (e *Expectation) On(on func(args []any) []any) {
-	e.on = on
+func (e *Expectation) Do(do func(args []any) []any) {
+	e.do = do
 }
 
 func (e *Expectation) isOpen() bool {
