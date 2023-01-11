@@ -7,17 +7,20 @@ import (
 )
 
 type Mock struct {
-	logger Logger
+	test Test
 
 	mu      sync.Mutex
 	methods map[string][]*Expectation
 }
 
-func newMock(logger Logger) *Mock {
+func NewMock(t Test) *Mock {
 	m := &Mock{
-		logger:  logger,
+		test:    t,
 		methods: make(map[string][]*Expectation),
 	}
+
+	t.Cleanup(m.checkExpectations)
+
 	return m
 }
 
@@ -36,7 +39,7 @@ func (m *Mock) Call(method string, args []any) []any {
 	expectations := m.methods[method]
 	if expectations == nil {
 		m.mu.Unlock()
-		m.logger.Fatalf("Method %q has no expectations", method)
+		m.test.Fatalf("Method %q has no expectations", method)
 		return nil
 	}
 
@@ -68,17 +71,17 @@ func (m *Mock) Call(method string, args []any) []any {
 		}
 	}
 	if len(open) > 0 {
-		m.logger.Logf("Calling:")
-		m.logger.Logf("  %v(%v)", method, formatArgs(args))
-		m.logger.Logf("Open expectations:")
+		m.test.Logf("Calling:")
+		m.test.Logf("  %v(%v)", method, formatArgs(args))
+		m.test.Logf("Open expectations:")
 		for _, e := range open {
-			m.logger.Logf("  %v(%v)", method, formatArgs(e.args))
+			m.test.Logf("  %v(%v)", method, formatArgs(e.args))
 		}
 	}
 
 	// Must release the mutex before Fatalf because it can panic.
 	m.mu.Unlock()
-	m.logger.Fatalf("No matching expectations")
+	m.test.Fatalf("No matching expectations")
 
 	return nil
 }
@@ -91,10 +94,10 @@ func (m *Mock) checkExpectations() {
 		for _, e := range expectations {
 			if !e.isSatisfied() {
 				if first {
-					m.logger.Logf("Unsatisfied expectations:")
+					m.test.Logf("Unsatisfied expectations:")
 					first = false
 				}
-				m.logger.Logf("  %v(%v)", method, formatArgs(e.args))
+				m.test.Logf("  %v(%v)", method, formatArgs(e.args))
 			}
 		}
 	}
@@ -102,7 +105,7 @@ func (m *Mock) checkExpectations() {
 	m.mu.Unlock()
 
 	if !first {
-		m.logger.Fatalf("Mock has unsatisfied expectations")
+		m.test.Fatalf("Mock has unsatisfied expectations")
 	}
 }
 

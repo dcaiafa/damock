@@ -9,8 +9,8 @@ type MockFoo struct {
 	*hammock.Mock
 }
 
-func NewMockFoo(c *hammock.Controller) *MockFoo {
-	return &MockFoo{Mock: c.NewMock()}
+func NewMockFoo(t hammock.Test) *MockFoo {
+	return &MockFoo{Mock: hammock.NewMock(t)}
 }
 
 func (m *MockFoo) DoStuff(i int, s *Struct) (int, error) {
