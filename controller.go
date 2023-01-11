@@ -2,22 +2,26 @@ package hammock
 
 import (
 	"sync"
-	"testing"
 )
 
+type Logger interface {
+	Logf(msg string, args ...any)
+	Fatalf(msg string, args ...any)
+}
+
 type Controller struct {
-	t testing.TB
+	logger Logger
 
 	mu    sync.Mutex
 	mocks []*Mock
 }
 
-func NewController(t testing.TB) *Controller {
-	return &Controller{t: t}
+func NewController(logger Logger) *Controller {
+	return &Controller{logger: logger}
 }
 
 func (c *Controller) NewMock() *Mock {
-	m := newMock(c)
+	m := newMock(c.logger)
 
 	c.mu.Lock()
 	c.mocks = append(c.mocks, m)
@@ -27,8 +31,6 @@ func (c *Controller) NewMock() *Mock {
 }
 
 func (c *Controller) Finish() {
-	c.t.Helper()
-
 	c.mu.Lock()
 	mocks := c.mocks
 	c.mocks = nil
@@ -37,14 +39,4 @@ func (c *Controller) Finish() {
 	for _, m := range mocks {
 		m.checkExpectations()
 	}
-}
-
-func (c *Controller) Failf(msg string, args ...any) {
-	c.t.Helper()
-	c.t.Fatalf(msg, args...)
-}
-
-func (c *Controller) Logf(msg string, args ...any) {
-	c.t.Helper()
-	c.t.Logf(msg, args...)
 }
