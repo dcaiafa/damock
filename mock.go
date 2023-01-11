@@ -45,6 +45,9 @@ func (m *Mock) Call(method string, args []any) []any {
 
 		if e.isMatch(args) {
 			e.calls++
+
+			// Must release the mutex before processing any callbacks as this can
+			// result in reentrancy.
 			m.mu.Unlock()
 
 			if e.do != nil {
@@ -54,6 +57,8 @@ func (m *Mock) Call(method string, args []any) []any {
 		}
 	}
 
+	// Failed to find a matching expectation.
+	// Log and fail.
 	var open []*Expectation
 	for _, e := range expectations {
 		if e.isOpen() {
@@ -69,6 +74,7 @@ func (m *Mock) Call(method string, args []any) []any {
 		}
 	}
 
+	// Must release the mutex before Failf because it can panic.
 	m.mu.Unlock()
 	m.controller.Failf("No matching expectations")
 
