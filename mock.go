@@ -1,8 +1,12 @@
 package hammock
 
+import "sync"
+
 type Mock struct {
 	controller *Controller
-	methods    map[string][]*Expectation
+
+	mu      sync.Mutex
+	methods map[string][]*Expectation
 }
 
 func newMock(c *Controller) *Mock {
@@ -14,6 +18,9 @@ func newMock(c *Controller) *Mock {
 }
 
 func (m *Mock) Expect(method string, args []any) *Expectation {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	e := newExpectation(args)
 	m.methods[method] = append(m.methods[method], e)
 	return e
@@ -22,8 +29,11 @@ func (m *Mock) Expect(method string, args []any) *Expectation {
 func (m *Mock) Call(method string, args []any) []any {
 	m.controller.t.Helper()
 
+	m.mu.Lock()
+
 	expectations := m.methods[method]
 	if expectations == nil {
+		m.mu.Unlock()
 		m.controller.Failf("Method %q has no expectations", method)
 		return nil
 	}
@@ -35,6 +45,8 @@ func (m *Mock) Call(method string, args []any) []any {
 
 		if e.isMatch(args) {
 			e.calls++
+			m.mu.Unlock()
+
 			if e.do != nil {
 				return e.do(args)
 			}
@@ -56,12 +68,17 @@ func (m *Mock) Call(method string, args []any) []any {
 			m.controller.Logf("  %v(%v)", method, formatArgs(e.args))
 		}
 	}
+
+	m.mu.Unlock()
 	m.controller.Failf("No matching expectations")
+
 	return nil
 }
 
 func (m *Mock) checkExpectations() {
 	m.controller.t.Helper()
+
+	m.mu.Lock()
 
 	first := true
 	for method, expectations := range m.methods {
@@ -75,6 +92,9 @@ func (m *Mock) checkExpectations() {
 			}
 		}
 	}
+
+	m.mu.Unlock()
+
 	if !first {
 		m.controller.Failf("Mock has unsatisfied expectations")
 	}

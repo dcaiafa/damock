@@ -1,9 +1,14 @@
 package hammock
 
-import "testing"
+import (
+	"sync"
+	"testing"
+)
 
 type Controller struct {
-	t     testing.TB
+	t testing.TB
+
+	mu    sync.Mutex
 	mocks []*Mock
 }
 
@@ -13,13 +18,23 @@ func NewController(t testing.TB) *Controller {
 
 func (c *Controller) NewMock() *Mock {
 	m := newMock(c)
+
+	c.mu.Lock()
 	c.mocks = append(c.mocks, m)
+	c.mu.Unlock()
+
 	return m
 }
 
 func (c *Controller) Finish() {
 	c.t.Helper()
-	for _, m := range c.mocks {
+
+	c.mu.Lock()
+	mocks := c.mocks
+	c.mocks = nil
+	c.mu.Unlock()
+
+	for _, m := range mocks {
 		m.checkExpectations()
 	}
 }
