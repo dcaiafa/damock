@@ -1,6 +1,10 @@
 package hammock
 
-import "sync"
+import (
+	"fmt"
+	"strings"
+	"sync"
+)
 
 type Mock struct {
 	controller *Controller
@@ -104,4 +108,15 @@ func (m *Mock) checkExpectations() {
 	if !first {
 		m.controller.Failf("Mock has unsatisfied expectations")
 	}
+}
+
+func formatArgs(args []any) string {
+	var b strings.Builder
+	for i, arg := range args {
+		if i != 0 {
+			b.WriteString(", ")
+		}
+		fmt.Fprintf(&b, "%+v", arg)
+	}
+	return b.String()
 }

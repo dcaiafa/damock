@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/dcaiafa/hammock"
+	"github.com/dcaiafa/hammock/match"
 )
 
 func TestStuff(t *testing.T) {
@@ -12,11 +13,11 @@ func TestStuff(t *testing.T) {
 	defer c.Finish()
 
 	m := NewMockFoo(c)
-	Expect_Foo_DoStuff(m, 1, hammock.Any).
+	Expect_Foo_DoStuff(m, 1, match.Any).
 		Times(1).
 		Return(1, nil)
 
-	Expect_Foo_DoStuff(m, 1, hammock.MatcherT[*Struct](func(s *Struct) bool { return (s.A+s.B)%2 == 0 })).
+	Expect_Foo_DoStuff(m, 1, match.Custom(func(s *Struct) bool { return (s.A+s.B)%2 == 0 })).
 		Times(1).
 		Do(func(i int, s *Struct) (int, error) {
 			return i + s.A + s.B, nil

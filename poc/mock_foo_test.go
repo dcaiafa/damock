@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/dcaiafa/hammock"
-	"github.com/dcaiafa/hammock/mockgears"
+	"github.com/dcaiafa/hammock/match"
 )
 
 type MockFoo struct {
@@ -15,8 +15,8 @@ func NewMockFoo(c *hammock.Controller) *MockFoo {
 
 func (m *MockFoo) DoStuff(i int, s *Struct) (int, error) {
 	res := m.Call("DoStuff", []any{i, s})
-	r1 := mockgears.Get[int](res, 0)
-	r2 := mockgears.Get[error](res, 1)
+	r1 := hammock.Get[int](res, 0)
+	r2 := hammock.Get[error](res, 1)
 	return r1, r2
 }
 
@@ -37,16 +37,16 @@ func (r *mockFooDoStuff) Times(n int) *mockFooDoStuff {
 func (r *mockFooDoStuff) Do(f func(i int, s *Struct) (int, error)) {
 	r.e.Do(func(args []any) []any {
 		r1, r2 := f(
-			mockgears.Get[int](args, 0),
-			mockgears.Get[*Struct](args, 1),
+			hammock.Get[int](args, 0),
+			hammock.Get[*Struct](args, 1),
 		)
 		return []any{r1, r2}
 	})
 }
 
 func Expect_Foo_DoStuff[
-	A1 int | hammock.BasicMatchers | hammock.MatcherT[int],
-	A2 *Struct | hammock.BasicMatchers | hammock.MatcherT[*Struct],
+	A1 int | match.BasicMatchers | match.CustomType[int],
+	A2 *Struct | match.BasicMatchers | match.CustomType[*Struct],
 ](m *MockFoo, a1 A1, a2 A2) *mockFooDoStuff {
 	args := []any{a1, a2}
 	e := m.Expect("DoStuff", args)

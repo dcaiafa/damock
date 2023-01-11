@@ -1,4 +1,4 @@
-package mockgears
+package hammock
 
 func Get[T any](r []any, n int) T {
 	var ret T

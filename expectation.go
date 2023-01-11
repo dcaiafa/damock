@@ -1,5 +1,7 @@
 package hammock
 
+import "github.com/dcaiafa/hammock/match"
+
 type Expectation struct {
 	args     []any
 	results  []any
@@ -42,7 +44,7 @@ func (e *Expectation) isMatch(args []any) bool {
 		return false
 	}
 	for i := range args {
-		if !isMatch(e.args[i], args[i]) {
+		if !match.IsMatch(e.args[i], args[i]) {
 			return false
 		}
 	}
