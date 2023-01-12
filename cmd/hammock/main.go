@@ -3,13 +3,23 @@ package main
 import (
 	"flag"
 	"fmt"
-	"go/types"
 	"log"
-	"os"
-
-	"golang.org/x/tools/go/packages"
 )
 
+func main() {
+	flag.Parse()
+
+	a := NewAnalyzer()
+
+	iface, err := a.GetInterface(flag.Args()[0])
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(iface)
+}
+
+/*
 func main() {
 	flag.Parse()
 
@@ -57,3 +67,4 @@ func dump(pkg *packages.Package) {
 		}
 	}
 }
+*/
