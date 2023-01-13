@@ -1,4 +1,4 @@
-package main
+package parser
 
 import (
 	"fmt"
@@ -8,24 +8,21 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-type Analyzer struct {
+type Parser struct {
 	packages map[string]*packages.Package
 }
 
-func NewAnalyzer() *Analyzer {
-	return &Analyzer{
+func NewAnalyzer() *Parser {
+	return &Parser{
 		packages: make(map[string]*packages.Package),
 	}
 }
 
-func (a *Analyzer) GetInterface(name string) (types.Object, error) {
-	period := strings.LastIndex(name, ".")
-	if period == -1 {
-		return nil, fmt.Errorf("name is not fully qualified")
+func (a *Parser) GetInterface(name string) (types.Object, error) {
+	packageName, ifaceName, err := ParseFQName(name)
+	if err != nil {
+		return nil, err
 	}
-
-	packageName := name[:period]
-	ifaceName := name[period+1:]
 
 	pkg := a.packages[packageName]
 	if pkg == nil {
@@ -58,4 +55,14 @@ func (a *Analyzer) GetInterface(name string) (types.Object, error) {
 	}
 
 	return o, nil
+}
+
+func ParseFQName(name string) (string, string, error) {
+	period := strings.LastIndex(name, ".")
+	if period == -1 {
+		return "", "", fmt.Errorf("name is not fully qualified")
+	}
+	packageName := name[:period]
+	ifaceName := name[period+1:]
+	return packageName, ifaceName, nil
 }
