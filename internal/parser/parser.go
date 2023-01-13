@@ -12,7 +12,7 @@ type Parser struct {
 	packages map[string]*packages.Package
 }
 
-func NewAnalyzer() *Parser {
+func NewParser() *Parser {
 	return &Parser{
 		packages: make(map[string]*packages.Package),
 	}

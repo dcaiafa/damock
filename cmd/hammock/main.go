@@ -2,21 +2,23 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
+
+	"github.com/dcaiafa/hammock/internal/mockbldr"
+	"github.com/dcaiafa/hammock/internal/parser"
 )
 
 func main() {
 	flag.Parse()
 
-	a := NewAnalyzer()
+	parser := parser.NewParser()
 
-	iface, err := a.GetInterface(flag.Args()[0])
+	mock, err := mockbldr.Build(parser, flag.Args()[0])
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Println(iface)
+	mock.Dump()
 }
 
 /*
