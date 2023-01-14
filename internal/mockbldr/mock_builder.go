@@ -10,6 +10,7 @@ type Parser interface {
 }
 
 type Mock struct {
+	Name    string
 	Methods []*types.Func
 }
 
@@ -28,7 +29,9 @@ func Build(parser Parser, ifaceName string) (*Mock, error) {
 
 	iface := o.Type().Underlying().(*types.Interface)
 
-	m := &Mock{}
+	m := &Mock{
+		Name: o.Name(),
+	}
 
 	for i := 0; i < iface.NumMethods(); i++ {
 		method := iface.Method(i)

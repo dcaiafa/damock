@@ -3,7 +3,9 @@ package main
 import (
 	"flag"
 	"log"
+	"os"
 
+	"github.com/dcaiafa/hammock/internal/emitter"
 	"github.com/dcaiafa/hammock/internal/mockbldr"
 	"github.com/dcaiafa/hammock/internal/parser"
 )
@@ -13,12 +15,24 @@ func main() {
 
 	parser := parser.NewParser()
 
-	mock, err := mockbldr.Build(parser, flag.Args()[0])
+	mock, err := mockbldr.Build(parser, "github.com/dcaiafa/hammock/poc.Foo")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	mock.Dump()
+	e := emitter.New("github.com/dcaiafa/hammock/poc", "main")
+	e.WriteMock(mock)
+
+	out, err := os.Create("gen_mock.go")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer out.Close()
+
+	err = e.Finish(out)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 /*
