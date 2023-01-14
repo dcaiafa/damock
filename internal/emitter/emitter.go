@@ -3,6 +3,7 @@ package emitter
 import (
 	"bytes"
 	"fmt"
+	"go/types"
 	"io"
 
 	"github.com/dcaiafa/hammock/internal/mockbldr"
@@ -29,13 +30,27 @@ func New(pkgPath, pkgName string) *Emitter {
 }
 
 func (e *Emitter) WriteMock(m *mockbldr.Mock) {
-	fmt.Fprintf(e.bodyBuf, "type %v struct {\n", "mock"+m.Name)
+	fmt.Fprintf(e.bodyBuf, "type %v struct {\n", e.mockName(m))
 	fmt.Fprintf(e.bodyBuf, "  *%v.Mock\n", e.packageAlias(hammockPackage))
-	fmt.Fprintf(e.bodyBuf, "}")
+	fmt.Fprintf(e.bodyBuf, "}\n")
 
 	for _, method := range m.Methods {
-		_ = method
+		e.emitMethod(m, method)
 	}
+}
+
+func (e *Emitter) mockName(m *mockbldr.Mock) string {
+	return "mock" + m.Name
+}
+
+func (e *Emitter) emitMethod(m *mockbldr.Mock, method *types.Func) {
+	fmt.Fprintf(e.bodyBuf, "\n")
+	fmt.Fprintf(e.bodyBuf, "func (m *%v) %v(%v) {\n",
+		e.mockName(m),
+		method.Name(),
+		"",
+	)
+	fmt.Fprintf(e.bodyBuf, "}\n")
 }
 
 func (e *Emitter) Finish(w io.Writer) error {
