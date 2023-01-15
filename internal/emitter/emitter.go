@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go/types"
 	"io"
+	"strings"
 
 	"github.com/dcaiafa/hammock/internal/mockbldr"
 )
@@ -45,12 +46,114 @@ func (e *Emitter) mockName(m *mockbldr.Mock) string {
 
 func (e *Emitter) emitMethod(m *mockbldr.Mock, method *types.Func) {
 	fmt.Fprintf(e.bodyBuf, "\n")
-	fmt.Fprintf(e.bodyBuf, "func (m *%v) %v(%v) {\n",
+	fmt.Fprintf(e.bodyBuf, "func (m *%v) %v(",
 		e.mockName(m),
 		method.Name(),
-		"",
 	)
+	sig := method.Type().(*types.Signature)
+	params := sig.Params()
+	for i := 0; i < params.Len(); i++ {
+		p := params.At(i)
+		if i != 0 {
+			fmt.Fprintf(e.bodyBuf, ", ")
+		}
+		fmt.Fprintf(e.bodyBuf, "%v %v", e.argStr(i), e.typeStr(p.Type()))
+	}
+	fmt.Fprintf(e.bodyBuf, ") ")
+
+	results := sig.Results()
+	if results.Len() > 0 {
+		fmt.Fprintf(e.bodyBuf, "(")
+		for i := 0; i < results.Len(); i++ {
+			r := results.At(i)
+			if i != 0 {
+				fmt.Fprintf(e.bodyBuf, ", ")
+			}
+			fmt.Fprintf(e.bodyBuf, "%v %v", e.resultStr(i), e.typeStr(r.Type()))
+		}
+		fmt.Fprintf(e.bodyBuf, ") ")
+	}
+
+	fmt.Fprintf(e.bodyBuf, "{\n")
 	fmt.Fprintf(e.bodyBuf, "}\n")
+}
+
+func (e *Emitter) argStr(n int) string {
+	return fmt.Sprintf("a%d", n)
+}
+
+func (e *Emitter) resultStr(n int) string {
+	return fmt.Sprintf("r%d", n)
+}
+
+func (e *Emitter) signatureStr(sig *types.Signature) string {
+	var str strings.Builder
+
+	params := sig.Params()
+	str.WriteString("(")
+	for i := 0; i < params.Len(); i++ {
+		p := params.At(i)
+		if i != 0 {
+			str.WriteString(", ")
+		}
+		str.WriteString(e.typeStr(p.Type()))
+	}
+	str.WriteString(") ")
+
+	results := sig.Results()
+	if results.Len() > 1 {
+		str.WriteString("(")
+	}
+
+	for i := 0; i < results.Len(); i++ {
+		r := results.At(i)
+		if i != 0 {
+			str.WriteString(", ")
+		}
+		str.WriteString(e.typeStr(r.Type()))
+	}
+
+	if results.Len() > 1 {
+		str.WriteString(")")
+	}
+
+	return str.String()
+}
+
+func (e *Emitter) typeStr(t types.Type) string {
+	switch t := t.(type) {
+	case *types.Basic:
+		return t.String()
+	case *types.Pointer:
+		return "*" + e.typeStr(t.Elem())
+	case *types.Named:
+		name := t.Obj().Name()
+		pkgPath := ""
+		if pkg := t.Obj().Pkg(); pkg != nil {
+			pkgPath = pkg.Path()
+		}
+		prefix := e.packageAlias(pkgPath)
+		if prefix != "" {
+			prefix += "."
+		}
+		return prefix + name
+	case *types.Interface:
+		var str strings.Builder
+		str.WriteString("interface {")
+		for i := 0; i < t.NumMethods(); i++ {
+			method := t.Method(i)
+			if i != 0 {
+				str.WriteString("; ")
+			}
+			str.WriteString(method.Name())
+			str.WriteString(e.signatureStr(method.Type().(*types.Signature)))
+		}
+		str.WriteString("}")
+		return str.String()
+
+	default:
+		panic(fmt.Sprintf("type not supported: %v", t))
+	}
 }
 
 func (e *Emitter) Finish(w io.Writer) error {
@@ -75,11 +178,15 @@ func (e *Emitter) Finish(w io.Writer) error {
 	return nil
 }
 
-func (e *Emitter) packageAlias(pkgName string) string {
-	alias, ok := e.imports[pkgName]
+func (e *Emitter) packageAlias(pkgPath string) string {
+	if pkgPath == "" || pkgPath == e.pkgPath {
+		return ""
+	}
+
+	alias, ok := e.imports[pkgPath]
 	if !ok {
 		alias = fmt.Sprintf("p%d", len(e.imports))
-		e.imports[pkgName] = alias
+		e.imports[pkgPath] = alias
 	}
 	return alias
 }
