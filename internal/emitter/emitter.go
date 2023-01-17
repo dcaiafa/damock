@@ -11,6 +11,7 @@ import (
 )
 
 const hammockPackage = "github.com/dcaiafa/hammock"
+const matchPackage = "github.com/dcaiafa/hammock/match"
 
 type Emitter struct {
 	pkgPath string
@@ -85,19 +86,25 @@ func (e *Emitter) emitMethod(m *mockbldr.Mock, method *types.Func) {
 	}
 
 	fmt.Fprintf(e.bodyBuf, "{\n")
+	fmt.Fprintf(e.bodyBuf, "  ")
+	if results.Len() > 0 {
+		fmt.Fprintf(e.bodyBuf, "res := ")
+	}
 	fmt.Fprintf(
-		e.bodyBuf, "  res := m.Call(%q, []any{%v})\n",
+		e.bodyBuf, "m.Call(%q, []any{%v})\n",
 		method.Name(),
 		strings.Join(paramNames(), ", "))
 
 	for i := 0; i < results.Len(); i++ {
 		r := results.At(i)
 		fmt.Fprintf(
-			e.bodyBuf, "  %v := %v.Get[%v](res, %d)\n",
+			e.bodyBuf, "  %v = %v.Get[%v](res, %d)\n",
 			e.resultStr(nil, i), hammockPackageAlias, e.typeStr(r.Type()), i)
 	}
 
-	fmt.Fprintf(e.bodyBuf, "  return\n")
+	if results.Len() > 0 {
+		fmt.Fprintf(e.bodyBuf, "  return\n")
+	}
 	fmt.Fprintf(e.bodyBuf, "}\n")
 
 	fmt.Fprintf(e.bodyBuf, "\n")
@@ -106,33 +113,31 @@ func (e *Emitter) emitMethod(m *mockbldr.Mock, method *types.Func) {
 
 func (e *Emitter) emitExpectation(m *mockbldr.Mock, method *types.Func) {
 	hammockPackageAlias := e.packageAlias(hammockPackage)
+	matchPackageAlias := e.packageAlias(matchPackage)
 
 	sig := method.Type().(*types.Signature)
 	params := sig.Params()
 	results := sig.Results()
 
+	// Expectation struct:
 	expectationName := e.expectationName(m, method)
 	fmt.Fprintf(e.bodyBuf, "type %v struct {\n", expectationName)
 	fmt.Fprintf(e.bodyBuf, "  e *%v.Expectation\n", e.packageAlias(hammockPackage))
 	fmt.Fprintf(e.bodyBuf, "}\n")
 	fmt.Fprintf(e.bodyBuf, "\n")
 
-	varAndTypes := make([]string, results.Len())
-	onlyVars := make([]string, results.Len())
-	for i := 0; i < results.Len(); i++ {
-		r := results.At(i)
-		varAndTypes[i] = fmt.Sprintf("%v %v", e.resultStr(nil, i), e.typeStr(r.Type()))
-		onlyVars[i] = e.resultStr(nil, i)
-	}
-
+	// Return:
 	fmt.Fprintf(e.bodyBuf, "func (e *%v) Return(%v) *%v {\n",
-		expectationName, strings.Join(varAndTypes, ", "), expectationName)
-	fmt.Fprintf(e.bodyBuf, "  e.e.Return([]any{%v})\n", strings.Join(onlyVars, ", "))
+		expectationName, e.varNameAndTypePairs(results, e.resultStr), expectationName)
+	fmt.Fprintf(e.bodyBuf, "  e.e.Return([]any{%v})\n", e.varNames(results, e.resultStr))
+	fmt.Fprintf(e.bodyBuf, "  return e\n")
 	fmt.Fprintf(e.bodyBuf, "}\n")
+	fmt.Fprintf(e.bodyBuf, "\n")
 
-	fmt.Fprintf(e.bodyBuf, "func (e *%v) Do( f func(%v) (%v)) {\n",
+	// Do:
+	fmt.Fprintf(e.bodyBuf, "func (e *%v) Do(f func(%v) (%v)) *%v {\n",
 		expectationName, e.varNameAndTypePairs(params, e.argStr),
-		e.varTypes(results))
+		e.varTypes(results), expectationName)
 	fmt.Fprintf(e.bodyBuf, "  e.e.Do(func(args []any) []any {\n")
 	rets := e.varNames(results, e.resultStr)
 	fmt.Fprintf(e.bodyBuf, "    ")
@@ -148,6 +153,32 @@ func (e *Emitter) emitExpectation(m *mockbldr.Mock, method *types.Func) {
 	fmt.Fprintf(e.bodyBuf, "    )\n")
 	fmt.Fprintf(e.bodyBuf, "    return []any{%v}\n", rets)
 	fmt.Fprintf(e.bodyBuf, "  })\n")
+	fmt.Fprintf(e.bodyBuf, "  return e\n")
+	fmt.Fprintf(e.bodyBuf, "}\n")
+	fmt.Fprintf(e.bodyBuf, "\n")
+
+	// Times:
+	fmt.Fprintf(e.bodyBuf, "func (e *%v) Times(n int) *%v {\n", expectationName, expectationName)
+	fmt.Fprintf(e.bodyBuf, "  e.e.Times(n)\n")
+	fmt.Fprintf(e.bodyBuf, "  return e\n")
+	fmt.Fprintf(e.bodyBuf, "}\n")
+	fmt.Fprintf(e.bodyBuf, "\n")
+
+	// Expect:
+	fmt.Fprintf(e.bodyBuf, "func Expect_%v_%v[\n", m.Name, method.Name())
+	for i := 0; i < params.Len(); i++ {
+		p := params.At(i)
+		fmt.Fprintf(e.bodyBuf, "  A%d %v | %v.BasicMatchers | %v.CustomType[%v],\n",
+			i, e.typeStr(p.Type()), matchPackageAlias, matchPackageAlias, e.typeStr(p.Type()))
+	}
+	fmt.Fprintf(e.bodyBuf, "](\n")
+	fmt.Fprintf(e.bodyBuf, "  m *%v,", e.mockName(m))
+	for i := 0; i < params.Len(); i++ {
+		p := params.At(i)
+		fmt.Fprintf(e.bodyBuf, "  %v A%d,\n", e.argStr(p, i), i)
+	}
+	fmt.Fprintf(e.bodyBuf, ") *%v {\n", expectationName)
+	fmt.Fprintf(e.bodyBuf, "  return nil\n")
 	fmt.Fprintf(e.bodyBuf, "}\n")
 }
 
