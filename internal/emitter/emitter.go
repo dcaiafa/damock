@@ -59,7 +59,7 @@ func (e *Emitter) emitMethod(m *mockbldr.Mock, method *types.Func) {
 		if i != 0 {
 			fmt.Fprintf(e.bodyBuf, ", ")
 		}
-		fmt.Fprintf(e.bodyBuf, "%v %v", e.argStr(i), e.typeStr(p.Type()))
+		fmt.Fprintf(e.bodyBuf, "%v %v", e.argStr(nil, i), e.typeStr(p.Type()))
 	}
 	fmt.Fprintf(e.bodyBuf, ") ")
 
@@ -71,7 +71,7 @@ func (e *Emitter) emitMethod(m *mockbldr.Mock, method *types.Func) {
 			if i != 0 {
 				fmt.Fprintf(e.bodyBuf, ", ")
 			}
-			fmt.Fprintf(e.bodyBuf, "%v %v", e.resultStr(i), e.typeStr(r.Type()))
+			fmt.Fprintf(e.bodyBuf, "%v %v", e.resultStr(nil, i), e.typeStr(r.Type()))
 		}
 		fmt.Fprintf(e.bodyBuf, ") ")
 	}
@@ -79,7 +79,7 @@ func (e *Emitter) emitMethod(m *mockbldr.Mock, method *types.Func) {
 	paramNames := func() []string {
 		names := make([]string, params.Len())
 		for i := 0; i < params.Len(); i++ {
-			names[i] = e.argStr(i)
+			names[i] = e.argStr(nil, i)
 		}
 		return names
 	}
@@ -94,7 +94,7 @@ func (e *Emitter) emitMethod(m *mockbldr.Mock, method *types.Func) {
 		r := results.At(i)
 		fmt.Fprintf(
 			e.bodyBuf, "  %v := %v.Get[%v](res, %d)\n",
-			e.resultStr(i), hammockPackageAlias, e.typeStr(r.Type()), i)
+			e.resultStr(nil, i), hammockPackageAlias, e.typeStr(r.Type()), i)
 	}
 
 	fmt.Fprintf(e.bodyBuf, "  return\n")
@@ -105,7 +105,10 @@ func (e *Emitter) emitMethod(m *mockbldr.Mock, method *types.Func) {
 }
 
 func (e *Emitter) emitExpectation(m *mockbldr.Mock, method *types.Func) {
+	hammockPackageAlias := e.packageAlias(hammockPackage)
+
 	sig := method.Type().(*types.Signature)
+	params := sig.Params()
 	results := sig.Results()
 
 	expectationName := e.expectationName(m, method)
@@ -118,25 +121,70 @@ func (e *Emitter) emitExpectation(m *mockbldr.Mock, method *types.Func) {
 	onlyVars := make([]string, results.Len())
 	for i := 0; i < results.Len(); i++ {
 		r := results.At(i)
-		varAndTypes[i] = fmt.Sprintf("%v %v", e.resultStr(i), e.typeStr(r.Type()))
-		onlyVars[i] = e.resultStr(i)
+		varAndTypes[i] = fmt.Sprintf("%v %v", e.resultStr(nil, i), e.typeStr(r.Type()))
+		onlyVars[i] = e.resultStr(nil, i)
 	}
 
 	fmt.Fprintf(e.bodyBuf, "func (e *%v) Return(%v) *%v {\n",
 		expectationName, strings.Join(varAndTypes, ", "), expectationName)
 	fmt.Fprintf(e.bodyBuf, "  e.e.Return([]any{%v})\n", strings.Join(onlyVars, ", "))
 	fmt.Fprintf(e.bodyBuf, "}\n")
+
+	fmt.Fprintf(e.bodyBuf, "func (e *%v) Do( f func(%v) (%v)) {\n",
+		expectationName, e.varNameAndTypePairs(params, e.argStr),
+		e.varTypes(results))
+	fmt.Fprintf(e.bodyBuf, "  e.e.Do(func(args []any) []any {\n")
+	rets := e.varNames(results, e.resultStr)
+	fmt.Fprintf(e.bodyBuf, "    ")
+	if rets != "" {
+		fmt.Fprintf(e.bodyBuf, "%v := ", rets)
+	}
+	fmt.Fprintf(e.bodyBuf, "f(\n")
+	for i := 0; i < params.Len(); i++ {
+		p := params.At(i)
+		fmt.Fprintf(e.bodyBuf, "      %v.Get[%v](args, %d),\n",
+			hammockPackageAlias, e.typeStr(p.Type()), i)
+	}
+	fmt.Fprintf(e.bodyBuf, "    )\n")
+	fmt.Fprintf(e.bodyBuf, "    return []any{%v}\n", rets)
+	fmt.Fprintf(e.bodyBuf, "  })\n")
+	fmt.Fprintf(e.bodyBuf, "}\n")
+}
+
+func (e *Emitter) varNames(t *types.Tuple, nameFunc func(v *types.Var, n int) string) string {
+	res := make([]string, t.Len())
+	for i := 0; i < t.Len(); i++ {
+		res[i] = nameFunc(t.At(i), i)
+	}
+	return strings.Join(res, ", ")
+}
+
+func (e *Emitter) varTypes(t *types.Tuple) string {
+	typs := make([]string, t.Len())
+	for i := 0; i < t.Len(); i++ {
+		typs[i] = e.typeStr(t.At(i).Type())
+	}
+	return strings.Join(typs, ", ")
+}
+
+func (e *Emitter) varNameAndTypePairs(t *types.Tuple, nameFunc func(v *types.Var, n int) string) string {
+	nameAndTyps := make([]string, t.Len())
+	for i := 0; i < t.Len(); i++ {
+		v := t.At(i)
+		nameAndTyps[i] = fmt.Sprintf("%v %v", nameFunc(v, i), e.typeStr(v.Type()))
+	}
+	return strings.Join(nameAndTyps, ", ")
 }
 
 func (e *Emitter) expectationName(m *mockbldr.Mock, method *types.Func) string {
 	return e.mockName(m) + method.Name() + "Expectation"
 }
 
-func (e *Emitter) argStr(n int) string {
+func (e *Emitter) argStr(v *types.Var, n int) string {
 	return fmt.Sprintf("a%d", n)
 }
 
-func (e *Emitter) resultStr(n int) string {
+func (e *Emitter) resultStr(v *types.Var, n int) string {
 	return fmt.Sprintf("r%d", n)
 }
 
