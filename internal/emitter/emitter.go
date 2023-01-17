@@ -45,6 +45,8 @@ func (e *Emitter) mockName(m *mockbldr.Mock) string {
 }
 
 func (e *Emitter) emitMethod(m *mockbldr.Mock, method *types.Func) {
+	hammockPackageAlias := e.packageAlias(hammockPackage)
+
 	fmt.Fprintf(e.bodyBuf, "\n")
 	fmt.Fprintf(e.bodyBuf, "func (m *%v) %v(",
 		e.mockName(m),
@@ -74,8 +76,60 @@ func (e *Emitter) emitMethod(m *mockbldr.Mock, method *types.Func) {
 		fmt.Fprintf(e.bodyBuf, ") ")
 	}
 
+	paramNames := func() []string {
+		names := make([]string, params.Len())
+		for i := 0; i < params.Len(); i++ {
+			names[i] = e.argStr(i)
+		}
+		return names
+	}
+
 	fmt.Fprintf(e.bodyBuf, "{\n")
+	fmt.Fprintf(
+		e.bodyBuf, "  res := m.Call(%q, []any{%v})\n",
+		method.Name(),
+		strings.Join(paramNames(), ", "))
+
+	for i := 0; i < results.Len(); i++ {
+		r := results.At(i)
+		fmt.Fprintf(
+			e.bodyBuf, "  %v := %v.Get[%v](res, %d)\n",
+			e.resultStr(i), hammockPackageAlias, e.typeStr(r.Type()), i)
+	}
+
+	fmt.Fprintf(e.bodyBuf, "  return\n")
 	fmt.Fprintf(e.bodyBuf, "}\n")
+
+	fmt.Fprintf(e.bodyBuf, "\n")
+	e.emitExpectation(m, method)
+}
+
+func (e *Emitter) emitExpectation(m *mockbldr.Mock, method *types.Func) {
+	sig := method.Type().(*types.Signature)
+	results := sig.Results()
+
+	expectationName := e.expectationName(m, method)
+	fmt.Fprintf(e.bodyBuf, "type %v struct {\n", expectationName)
+	fmt.Fprintf(e.bodyBuf, "  e *%v.Expectation\n", e.packageAlias(hammockPackage))
+	fmt.Fprintf(e.bodyBuf, "}\n")
+	fmt.Fprintf(e.bodyBuf, "\n")
+
+	varAndTypes := make([]string, results.Len())
+	onlyVars := make([]string, results.Len())
+	for i := 0; i < results.Len(); i++ {
+		r := results.At(i)
+		varAndTypes[i] = fmt.Sprintf("%v %v", e.resultStr(i), e.typeStr(r.Type()))
+		onlyVars[i] = e.resultStr(i)
+	}
+
+	fmt.Fprintf(e.bodyBuf, "func (e *%v) Return(%v) *%v {\n",
+		expectationName, strings.Join(varAndTypes, ", "), expectationName)
+	fmt.Fprintf(e.bodyBuf, "  e.e.Return([]any{%v})\n", strings.Join(onlyVars, ", "))
+	fmt.Fprintf(e.bodyBuf, "}\n")
+}
+
+func (e *Emitter) expectationName(m *mockbldr.Mock, method *types.Func) string {
+	return e.mockName(m) + method.Name() + "Expectation"
 }
 
 func (e *Emitter) argStr(n int) string {
