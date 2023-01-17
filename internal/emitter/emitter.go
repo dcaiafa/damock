@@ -168,8 +168,13 @@ func (e *Emitter) emitExpectation(m *mockbldr.Mock, method *types.Func) {
 	fmt.Fprintf(e.bodyBuf, "func Expect_%v_%v[\n", m.Name, method.Name())
 	for i := 0; i < params.Len(); i++ {
 		p := params.At(i)
-		fmt.Fprintf(e.bodyBuf, "  A%d %v | %v.BasicMatchers | %v.CustomType[%v],\n",
-			i, e.typeStr(p.Type()), matchPackageAlias, matchPackageAlias, e.typeStr(p.Type()))
+		fmt.Println(p)
+		if _, ok := p.Type().(*types.Interface); ok {
+			fmt.Fprintf(e.bodyBuf, "  A%d any,\n", i)
+		} else {
+			fmt.Fprintf(e.bodyBuf, "  A%d %v | %v.BasicMatchers | %v.CustomType[%v],\n",
+				i, e.typeStr(p.Type()), matchPackageAlias, matchPackageAlias, e.typeStr(p.Type()))
+		}
 	}
 	fmt.Fprintf(e.bodyBuf, "](\n")
 	fmt.Fprintf(e.bodyBuf, "  m *%v,", e.mockName(m))
@@ -322,4 +327,15 @@ func (e *Emitter) packageAlias(pkgPath string) string {
 		e.imports[pkgPath] = alias
 	}
 	return alias
+}
+
+func isGenericUnionCompatible(t types.Type) bool {
+	switch t := t.(type) {
+	case *types.Named:
+		return isGenericUnionCompatible(t.Underlying())
+	case *types.Interface:
+		return false
+	default:
+		return true
+	}
 }
